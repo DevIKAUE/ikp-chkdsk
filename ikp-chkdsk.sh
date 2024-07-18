@@ -161,7 +161,7 @@ main () {
 
 # Variables
 SCRIPTDIR="$( cd "$( dirname "$0" )" && pwd )"
-HOSTNAME=$(cat /etc/hostname)
+HOSTNAME=$(cat /etc/hostname 2>/dev/null || hostname)
 PACKAGE="ikp-chkdsk"
 CHECK_DATE=$(date '+%Y%m%d')
 UPDATE_URL=$(grep -o '^UPDATE_URL=.*' .env | cut -d '=' -f2)
