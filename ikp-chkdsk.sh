@@ -96,6 +96,7 @@ check_updates() {
             echo "> A new version is available: $NEW_VERSION. Updating..."
             wget -qO "$3" "$2"
             mv "$3" "$6"
+            sudo chmod +x "$6"
             echo "$NEW_VERSION" > "$DATADIR/VERSION"
             echo "> Update completed."
         else
