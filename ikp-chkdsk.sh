@@ -1,7 +1,7 @@
 #!/bin/sh
 # We want to make this script as shell-agnostic as possible
 # Requires 'curl' to work properly
-VERSION=3
+VERSION=4
 
 uninstall () {
     # :param $1 is the log directory
@@ -130,7 +130,6 @@ TMPDIR="/tmp/$PACKAGE/$CHECK_DATE"
 TMPCRONFILE="$TMPDIR/$PACKAGE.sh"
 CRONFILE="/etc/cron.daily/$PACKAGE"
 DATADIR="/etc/$PACKAGE"
-VERSION=$(cat "$SCRIPTDIR"/VERSION 2>/dev/null || cat "$DATADIR"/VERSION 2>/dev/null || echo "0")
 
 # Check for script arguments
 if [ "$1" = "--install" ]; then
