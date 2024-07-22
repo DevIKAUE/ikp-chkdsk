@@ -1,6 +1,7 @@
 #!/bin/sh
 # We want to make this script as shell-agnostic as possible
 # Requires 'curl' to work properly
+VERSION=3
 
 uninstall () {
     # :param $1 is the log directory
@@ -69,53 +70,11 @@ create_json() {
     echo $DATA_JSON
 }
 
-check_updates() {
-    # :param $1 is the UPDATE_URL
-    # :param $2 is the PACKAGE_URL
-    # :param $3 is the TMPCRONFILE
-    # :param $4 is the TMPUPDATEFILE
-    # :param $5 is the TMPDIR
-    # :param $6 is the CRONFILE
-    # Assuming current_version and cronfile are defined elsewhere
-    echo "> Downloading update file from '$1'..."
-    wget -qO "$4" "$1"
-
-    echo "> Checking for newer versions... (current version: $VERSION)"
-    # Check if CRONFILE exists
-    if [ -f "$6" ]; then
-        # Fetch the update and grep to extract the version
-        NEW_VERSION=$(cat "$4")
-
-        if [ -z "$NEW_VERSION" ]; then
-            echo "> Unable to find VERSION in the update."
-            return
-        fi
-
-        # Compare versions
-        if [ "$NEW_VERSION" -gt "$VERSION" ]; then
-            echo "> A new version is available: $NEW_VERSION. Updating..."
-            wget -qO "$3" "$2"
-            mv "$3" "$6"
-            sudo chmod +x "$6"
-            echo "$NEW_VERSION" > "$DATADIR/VERSION"
-            echo "> Update completed."
-        else
-            echo "> You are up to date. Current version: $VERSION."
-        fi
-    else
-        echo "> Data file $6 not found."
-    fi
-
-    # Remove tmpdir
-    rm -r "$5"
-}
-
 install () {
     echo "> Installing chkdsk..."
     check_root
     check_curl
     prepare "$LOGDIR" "$DATADIR" "$TMPDIR"
-    echo "$VERSION" > "$DATADIR/VERSION"
     wget -qO "$CRONFILE" "$PACKAGE_URL"
     echo "> Installation complete!"
 }
@@ -125,8 +84,6 @@ main () {
     check_root
     echo "> Checking requirements..."
     check_curl
-    echo "> Checking for updates..."
-    check_updates "$UPDATE_URL" "$PACKAGE_URL" "$TMPCRONFILE" "$TMPUPDATEFILE" "$TMPDIR" "$CRONFILE"
     echo "> Preparing disk check..."
     prepare "$LOGDIR" "$DATADIR" "$TMPDIR"
     echo "> Reporting variables..."
@@ -136,7 +93,6 @@ main () {
         "VERSION: $VERSION" \
         "PACKAGE: $PACKAGE" \
         "CHECK_DATE: $CHECK_DATE" \
-        "UPDATE_URL: $UPDATE_URL" \
         "REPORT_BASE_URL: $REPORT_BASE_URL" \
         "TOKEN: $TOKEN" \
         "LOGDIR: $LOGDIR" \
@@ -165,7 +121,6 @@ SCRIPTDIR="$( cd "$( dirname "$0" )" && pwd )"
 HOSTNAME=$(cat /etc/hostname 2>/dev/null || hostname)
 PACKAGE="ikp-chkdsk"
 CHECK_DATE=$(date '+%Y%m%d')
-UPDATE_URL=$(grep -o '^UPDATE_URL=.*' .env | cut -d '=' -f2)
 PACKAGE_URL=$(grep -o '^PACKAGE_URL=.*' .env | cut -d '=' -f2)
 REPORT_BASE_URL=$(grep -o '^REPORT_BASE_URL=.*' .env | cut -d '=' -f2)
 TOKEN=$(grep -o '^TOKEN=.*' .env | cut -d '=' -f2)
@@ -173,7 +128,6 @@ LOGDIR="/var/log/$PACKAGE/$CHECK_DATE"
 LOGFILE="$LOGDIR/$PACKAGE.log"
 TMPDIR="/tmp/$PACKAGE/$CHECK_DATE"
 TMPCRONFILE="$TMPDIR/$PACKAGE.sh"
-TMPUPDATEFILE="$TMPDIR/VERSION"
 CRONFILE="/etc/cron.daily/$PACKAGE"
 DATADIR="/etc/$PACKAGE"
 VERSION=$(cat "$SCRIPTDIR"/VERSION 2>/dev/null || cat "$DATADIR"/VERSION 2>/dev/null || echo "0")
