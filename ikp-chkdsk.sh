@@ -1,20 +1,23 @@
 #!/bin/sh
 # We want to make this script as shell-agnostic as possible
-# Requires 'curl' to work properly
-VERSION=4
+# Requires curl, grep, sed, paste, awk, date to work properly
+VERSION=5
+
+add_crontab_if_not_exists () {
+    (crontab -l | grep -q $SCRIPTPATH) && echo '>> Warning: Crontab entry already exists, skipping.' && return
+
+    # Add the crontab entry
+    (crontab -l 2>/dev/null; echo "0 8,15,22 * * * $SCRIPTPATH") | crontab -
+}
+
+remove_crontab_if_exists () {
+    (crontab -l | grep -v $SCRIPTPATH | crontab -) || echo '>> Warning: Crontab entry does not exist, skipping.'
+}
 
 uninstall () {
-    # :param $1 is the log directory
-    # :param $2 is the chkdsk directory
-    # :param $3 is the CRONFILE
     echo "> Uninstalling chkdsk..."
-    check_root
-    echo "> Deleting log directory..."
-    rm -rf "$1"
-    echo "> Deleting chkdsk..."
-    rm -rf "$2"
-    echo "> Deleting cronfile..."
-    rm -rf "$3"
+    echo "> Deleting cron entry..."
+    remove_crontab_if_exists
     echo "> Uninstallation complete!"
 }
 
@@ -25,12 +28,16 @@ check_root () {
     fi
 }
 
-check_curl () {
-    if command -v curl >/dev/null; then
-        echo "curl is installed. Continuing with execution."
-    else
-        echo "WARN: curl is not installed. Please install curl."
-    fi
+check_commands () {
+    # Check if commands are available
+    for varname in "$@"; do
+        if command -v $varname >/dev/null; then
+             echo ">> $varname is installed. Continuing with execution."
+        else
+            echo ">> ERROR: $varname is not installed. Please install $varname."
+            exit 1
+        fi
+    done
 }
 
 prepare () {
@@ -72,23 +79,22 @@ create_json() {
 
 install () {
     echo "> Installing chkdsk..."
-    check_root
-    check_curl
-    prepare "$LOGDIR" "$DATADIR" "$TMPDIR"
-    wget -qO "$CRONFILE" "$PACKAGE_URL"
+    check_commands curl grep sed paste awk date
+    prepare "$LOGDIR" "$TMPDIR"
+    echo "> Adding cron entry..."
+    add_crontab_if_not_exists
     echo "> Installation complete!"
 }
 
 main () {
-    echo "> Checking for permissions..."
-    check_root
     echo "> Checking requirements..."
-    check_curl
+    check_commands curl grep sed paste awk date
     echo "> Preparing disk check..."
-    prepare "$LOGDIR" "$DATADIR" "$TMPDIR"
+    prepare "$LOGDIR" "$TMPDIR"
     echo "> Reporting variables..."
     info_variables \
         "SCRIPTDIR: $SCRIPTDIR" \
+        "SCRIPTPATH: $SCRIPTPATH" \
         "HOSTNAME: $HOSTNAME" \
         "VERSION: $VERSION" \
         "PACKAGE: $PACKAGE" \
@@ -99,10 +105,12 @@ main () {
         "LOGFILE: $LOGFILE" \
         "TMPDIR: $TMPDIR" \
         "TMPFILE: $TMPCRONFILE" \
-        "CRONFILE: $CRONFILE" \
         "DATADIR: $DATADIR"
     echo "> Starting disk check..."
-    DISK_CHECK=$(df --output=pcent -k / -k /home/ | sed '1d;s/[^0-9]//g' | paste -sd ' ' -)
+
+    # /run/user/1000/doc: Operation not permitted
+    DISK_CHECK=$(df --output=target,pcent 2>/dev/null | sed '1d;s/%//g' | awk '{print $1 " " $2}' | paste -sd ' ' -)
+
     echo "> Status..."
     echo "$DISK_CHECK"
     echo "> Reporting to $REPORT_BASE_URL..."
@@ -118,24 +126,22 @@ main () {
 
 # Variables
 SCRIPTDIR="$( cd "$( dirname "$0" )" && pwd )"
+SCRIPTPATH="$SCRIPTDIR/$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 HOSTNAME=$(cat /etc/hostname 2>/dev/null || hostname)
 PACKAGE="ikp-chkdsk"
 CHECK_DATE=$(date '+%Y%m%d')
-PACKAGE_URL=$(grep -o '^PACKAGE_URL=.*' .env | cut -d '=' -f2)
 REPORT_BASE_URL=$(grep -o '^REPORT_BASE_URL=.*' .env | cut -d '=' -f2)
 TOKEN=$(grep -o '^TOKEN=.*' .env | cut -d '=' -f2)
-LOGDIR="/var/log/$PACKAGE/$CHECK_DATE"
+LOGDIR="$SCRIPTDIR/log/$PACKAGE/$CHECK_DATE"
 LOGFILE="$LOGDIR/$PACKAGE.log"
 TMPDIR="/tmp/$PACKAGE/$CHECK_DATE"
 TMPCRONFILE="$TMPDIR/$PACKAGE.sh"
-CRONFILE="/etc/cron.daily/$PACKAGE"
-DATADIR="/etc/$PACKAGE"
 
 # Check for script arguments
 if [ "$1" = "--install" ]; then
     install
 elif [ "$1" = "--uninstall" ]; then
-    uninstall "$LOGDIR" "$DATADIR" "$CRONFILE"
+    uninstall "$LOGDIR"
 else
     main
 fi
