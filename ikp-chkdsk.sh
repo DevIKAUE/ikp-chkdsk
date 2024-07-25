@@ -1,17 +1,17 @@
 #!/bin/sh
 # We want to make this script as shell-agnostic as possible
 # Requires curl, grep, sed, paste, awk, date to work properly
-VERSION=5
+VERSION=6
 
 add_crontab_if_not_exists () {
-    (crontab -l | grep -q $SCRIPTPATH) && echo '>> Warning: Crontab entry already exists, skipping.' && return
+    (crontab -l | grep -q "$SCRIPTPATH") && echo '>> Warning: Crontab entry already exists, skipping.' && return
 
     # Add the crontab entry
     (crontab -l 2>/dev/null; echo "0 8,15,22 * * * $SCRIPTPATH") | crontab -
 }
 
 remove_crontab_if_exists () {
-    (crontab -l | grep -v $SCRIPTPATH | crontab -) || echo '>> Warning: Crontab entry does not exist, skipping.'
+    (crontab -l | grep -v "$SCRIPTPATH" | crontab -) || echo '>> Warning: Crontab entry does not exist, skipping.'
 }
 
 uninstall () {
@@ -31,7 +31,7 @@ check_root () {
 check_commands () {
     # Check if commands are available
     for varname in "$@"; do
-        if command -v $varname >/dev/null; then
+        if command -v "$varname" >/dev/null; then
              echo ">> $varname is installed. Continuing with execution."
         else
             echo ">> ERROR: $varname is not installed. Please install $varname."
@@ -69,12 +69,12 @@ create_json() {
     # Construct JSON dynamically from variables
     DATA_JSON="{"
     for varname in "$@"; do
-        key=$(echo $varname | cut -d ':' -f 1)
-        value=$(echo $varname | cut -d ':' -f 2-)
+        key=$(echo "$varname" | cut -d ':' -f 1)
+        value=$(echo "$varname" | cut -d ':' -f 2-)
         DATA_JSON="$DATA_JSON\"$key\": \"$value\","
     done
     DATA_JSON="${DATA_JSON%,}}"
-    echo $DATA_JSON
+    echo "$DATA_JSON"
 }
 
 install () {
@@ -104,8 +104,7 @@ main () {
         "LOGDIR: $LOGDIR" \
         "LOGFILE: $LOGFILE" \
         "TMPDIR: $TMPDIR" \
-        "TMPFILE: $TMPCRONFILE" \
-        "DATADIR: $DATADIR"
+        "TMPFILE: $TMPCRONFILE"
     echo "> Starting disk check..."
 
     # /run/user/1000/doc: Operation not permitted
